@@ -5,10 +5,13 @@ from __future__ import annotations
 import argparse
 import shutil
 import smtplib
+import sqlite3
 from pathlib import Path
 
 from mailrows import __version__, run, smtpcheck
-from mailrows.config import ConfigError, load
+from mailrows.config import ConfigError, load, looks_unset
+from mailrows.table import TableError
+from mailrows.template import TemplateError
 
 STARTER_FILES = {
     "config.example.ini": "config.ini",
@@ -69,7 +72,7 @@ def cmd_smtp_check(args) -> int:
     if not host:
         raise ConfigError("Give a host: --host smtp.example.com, or set [smtp] host in the config file.")
     user = user or ""
-    if user and (password is None or password.strip() in ("", "CHANGE_ME")):
+    if user and (password is None or looks_unset(password)):
         import getpass
 
         password = getpass.getpass(f"Password for {user} (not shown, not saved): ")
@@ -124,7 +127,8 @@ def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except (ConfigError, run.SetupError, smtplib.SMTPException, OSError, KeyboardInterrupt) as exc:
+    except (ConfigError, run.SetupError, TableError, TemplateError, sqlite3.Error,
+            smtplib.SMTPException, OSError, KeyboardInterrupt) as exc:
         message, code = explain_stop(exc)
         print("\n" + message)
         return code
@@ -137,6 +141,12 @@ def explain_stop(exc: BaseException) -> tuple[str, int]:
     if isinstance(exc, smtplib.SMTPAuthenticationError):
         return ("The mail server refused the username or password. Nothing was sent. "
                 "Run 'mailrows smtp-check' to test the login."), run.EXIT_SETUP
+    if isinstance(exc, sqlite3.Error):
+        return (f"Stopped: the send log couldn't be used ({exc}). If another mailrows run is using the same "
+                "log, wait for it to finish. Nothing already sent will be sent again."), run.EXIT_SETUP
+    if isinstance(exc, (TableError, TemplateError)):
+        return (f"Stopped: {exc}. Every email already sent is in the send log and won't be sent again.",
+                run.EXIT_SETUP)
     if isinstance(exc, KeyboardInterrupt):
         return "Stopped. Anything already sent is in the send log and won't be sent again.", 130
     return (f"Stopped: {exc}. Every email already sent is in the send log and won't be sent again. "

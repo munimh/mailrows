@@ -28,6 +28,10 @@ gitleaks detect --source . --redact
 - It never sends a password over an unencrypted connection to a remote server
   (`security = none` is only allowed with no login, or for `localhost`).
 - TLS certificates are verified with the system's trusted roots.
+- HTTP redirects are refused for Airtable and webhook calls, so a token or secret header is
+  never resent to another host. A webhook with a secret header must use `https://`.
+- A password that merely contains characters like `<` is accepted; only empty values and
+  obvious placeholders (`CHANGE_ME`, `<...>`) count as "not set".
 - Values written to spreadsheets are stored as plain text, never as formulas.
 - It talks only to the servers in your config. There is no telemetry.
 

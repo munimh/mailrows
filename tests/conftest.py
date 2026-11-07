@@ -21,7 +21,7 @@ from mailrows import config, run
 SRC = Path(__file__).resolve().parent.parent / "src"
 
 
-# ---------------------------------------------------------------- fake SMTP
+# == fake SMTP ==
 
 class SmtpHandler(socketserver.StreamRequestHandler):
     def reply(self, text: str) -> None:
@@ -114,7 +114,7 @@ def smtp():
     srv.server_close()
 
 
-# ---------------------------------------------------------------- fake Airtable
+# == fake Airtable ==
 
 class FakeAirtableState:
     def __init__(self):
@@ -206,7 +206,7 @@ def airtable():
     srv.server_close()
 
 
-# ---------------------------------------------------------------- a project folder
+# == a project folder ==
 
 HEADERS = ["id", "name", "email", "topic", "status"]
 ROWS = [

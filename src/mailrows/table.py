@@ -119,6 +119,7 @@ class CsvTable(Table):
             first = text.split("\n", 1)[0]
             delim = max([",", ";", "\t"], key=first.count)
         rows = list(csv.reader(io.StringIO(text, newline=""), delimiter=delim))
+        self.line_end = "\r\n" if b"\r\n" in raw else "\n"
         return rows, delim, bom
 
     def read(self):
@@ -151,7 +152,7 @@ class CsvTable(Table):
 
         def write(tmp: Path):
             with open(tmp, "w", encoding="utf-8-sig" if bom else "utf-8", newline="") as f:
-                csv.writer(f, delimiter=delim).writerows(rows)
+                csv.writer(f, delimiter=delim, lineterminator=self.line_end).writerows(rows)
 
         _replace_atomically(self.path, write)
         return written

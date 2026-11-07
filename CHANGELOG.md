@@ -23,3 +23,10 @@ First release.
 - `mailrows init`: a starter folder with a config, a sample sheet and templates.
 - Settings from `config.ini` or `MAILROWS_*` environment variables.
 - Double-click `.bat` helpers for Windows.
+- `[input] status_save_every` to group status-column saves for large spreadsheets.
+
+### Safety details
+- Ctrl+C before an email starts going releases the row, so it isn't held as "may have been sent".
+- A run stops after the mail server is unreachable twice in a row.
+- HTTP redirects are never followed with credentials; webhook secrets require https.
+- CSV files keep their original line endings when the status column is written.

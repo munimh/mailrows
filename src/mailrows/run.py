@@ -10,7 +10,8 @@ from pathlib import Path
 from mailrows import ledger as ledger_mod
 from mailrows.config import ConfigError, Settings
 from mailrows.hooks import Hook, HookError, HookRow, load_hooks
-from mailrows.mailer import Mailer, Refused, Sender, SmtpSettings, Uncertain, build_message, pause
+from mailrows.mailer import (Mailer, Refused, Sender, SmtpSettings, StoppedBeforeSending, Uncertain,
+                             build_message, pause)
 from mailrows.table import FileLocked, Row, Table, TableError
 from mailrows.template import Rendered, Template, TemplateError
 
@@ -19,6 +20,7 @@ EMAIL = re.compile(r"^[^@\s<>()\[\],;:\"]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9
 REAL, DRY, TEST = "real", "dry-run", "test"
 
 EXIT_OK, EXIT_PROBLEMS, EXIT_SETUP, EXIT_CANCELLED = 0, 1, 2, 3
+GIVE_UP_AFTER = 2  # mail server unreachable this many times in a row: stop instead of waiting on every row
 
 
 class SetupError(Exception):
@@ -66,7 +68,7 @@ def _out(*parts, end="\n"):
     print(*parts, end=end, flush=True)
 
 
-# ---------------------------------------------------------------- planning
+# == planning ==
 
 def prepare(settings: Settings, mode: str, out=_out) -> Job:
     try:
@@ -221,7 +223,7 @@ def hook_rows(job: Job) -> None:
                 it.action, it.reason = "bad", f"the email went out and its update is pending, but {why}"
 
 
-# ---------------------------------------------------------------- showing
+# == showing ==
 
 def _cut(text: str, width: int) -> str:
     text = " ".join(str(text).split())
@@ -280,18 +282,31 @@ def sample(job: Job, it: Item, mode: str, test_to: str, out=_out) -> None:
         out(f"  (also has an HTML version, {len(r.html)} characters)")
 
 
-# ---------------------------------------------------------------- sending
+# == sending ==
 
 class Statuses:
     """Writes the status column. If the file is locked, warns once and carries on: the send log,
-    not the spreadsheet, is what prevents a second email."""
+    not the spreadsheet, is what prevents a second email.
+
+    Writes can be grouped ([input] status_save_every = N) so a large .xlsx isn't re-saved after
+    every single email. Whatever is waiting is always written at the end of the run."""
 
     def __init__(self, job: Job, out):
         self.job, self.out, self.failed = job, out, False
+        self.every = max(1, job.settings.get_int("input", "status_save_every", 1))
+        self.waiting: dict[str, str] = {}
 
     def set(self, updates: dict[str, str]) -> None:
         if not self.job.status_col or not updates:
             return
+        self.waiting.update(updates)
+        if len(self.waiting) >= self.every:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self.waiting:
+            return
+        updates, self.waiting = self.waiting, {}
         try:
             self.job.table.set_values(self.job.id_col, self.job.status_col, updates)
         except (FileLocked, TableError, OSError) as exc:
@@ -304,7 +319,14 @@ class Statuses:
         """Make the status column agree with the send log."""
         if not self.job.status_col:
             return
-        _, rows = self.job.table.read()
+        self.flush()
+        try:
+            _, rows = self.job.table.read()
+        except (TableError, OSError) as exc:
+            if not self.failed:
+                self.out(f"  ! couldn't read the spreadsheet to update the status column ({exc}).")
+            self.failed = True
+            return
         entries = log.all_entries()
         updates = {}
         for r in rows:
@@ -317,6 +339,7 @@ class Statuses:
             if r.values.get(self.job.status_col, "") != want:
                 updates[rid] = want
         self.set(updates)
+        self.flush()
 
 
 def run_hooks(job: Job, it: Item, log: ledger_mod.Ledger, out) -> bool:
@@ -358,22 +381,35 @@ def execute(job: Job, mode: str, test_to: str = "", out=_out) -> int:
         if send:
             smtp, sender = SmtpSettings.from_settings(job.settings), Sender.from_settings(job.settings)
             delay = job.settings.get_float("sender", "delay_seconds", 2)
+            unreachable = attempted = 0
             with Mailer(smtp, sender) as mailer:
                 for n, it in enumerate(send):
-                    if n:
+                    if unreachable >= GIVE_UP_AFTER:
+                        left = len(send) - n
+                        problems += left
+                        out(f"\n  Stopped: the mail server could not be reached {unreachable} times in a row. "
+                            f"{left} email(s) were not tried and will go on the next run.")
+                        break
+                    if attempted:
                         pause(delay)
-                    fp = it.rendered.fingerprint()
-                    try:
-                        log.claim(it.row_id, fp, it.recipient, it.hooks)
-                    except ledger_mod.ClaimTaken:
-                        out(f"  skipped   {it.row_id}: another run has already sent it")
-                        continue
+                    # everything that can fail before the claim is done first, so a claim is
+                    # only ever left behind when the server may really have the email
                     message = build_message(sender, it.rendered)
                     envelope = [it.recipient] + ([sender.bcc] if sender.bcc else [])
                     try:
+                        log.claim(it.row_id, it.rendered.fingerprint(), it.recipient, it.hooks)
+                    except ledger_mod.ClaimTaken:
+                        out(f"  skipped   {it.row_id}: another run has already sent it")
+                        continue
+                    attempted += 1
+                    try:
                         mailer.send(message, envelope)
+                    except StoppedBeforeSending:
+                        log.release(it.row_id, "stopped with Ctrl+C before the email was handed over")
+                        raise
                     except Refused as exc:
                         log.release(it.row_id, str(exc))
+                        unreachable = unreachable + 1 if exc.unreachable else 0
                         problems += 1
                         out(f"  FAILED    {it.row_id} ({it.recipient}): {exc}. Not sent; a rerun will try again.")
                         continue
@@ -384,6 +420,7 @@ def execute(job: Job, mode: str, test_to: str = "", out=_out) -> int:
                         out(f"  UNKNOWN   {it.row_id} ({it.recipient}): {exc}. It won't be sent again "
                             f"automatically: check your Sent folder, then run 'mailrows resolve {it.row_id}'.")
                         continue
+                    unreachable = 0
                     log.mark_sent(it.row_id)
                     sent += 1
                     it.sent_at = (log.entry(it.row_id).sent_at or "")
@@ -398,11 +435,15 @@ def execute(job: Job, mode: str, test_to: str = "", out=_out) -> int:
                     else:
                         status.set({it.row_id: job.status_sent})
                         out(f"  sent      {it.row_id} -> {it.recipient}")
+        status.flush()
         if status.failed:
             status.failed = False
             status.sync(log)
     finally:
-        log.close()
+        try:
+            status.flush()  # even when stopped early, write what is waiting
+        finally:
+            log.close()
     out(f"\nDone. Emailed: {sent}   Updates retried: {updated}   Problems: {problems}")
     if status.failed:
         out("The status column could not be fully updated. Close the spreadsheet and run again to fix it; "
@@ -413,25 +454,32 @@ def execute(job: Job, mode: str, test_to: str = "", out=_out) -> int:
 def _execute_test(job: Job, test_to: str, out) -> int:
     smtp, sender = SmtpSettings.from_settings(job.settings), Sender.from_settings(job.settings)
     delay = job.settings.get_float("sender", "delay_seconds", 2)
-    sent = failed = 0
+    sent = failed = unreachable = 0
+    rows = job.of("send")
     with Mailer(smtp, sender) as mailer:
-        for n, it in enumerate(job.of("send")):
+        for n, it in enumerate(rows):
+            if unreachable >= GIVE_UP_AFTER:
+                failed += len(rows) - n
+                out(f"\n  Stopped: the mail server could not be reached {unreachable} times in a row.")
+                break
             if n:
                 pause(delay)
             r = it.rendered
             test = Rendered(to=test_to, subject="[TEST] " + r.subject, text=r.text, html=r.html)
             try:
                 mailer.send(build_message(sender, test), [test_to])
+                unreachable = 0
                 sent += 1
                 out(f"  test sent {it.row_id} (would go to {it.recipient})")
             except (Refused, Uncertain) as exc:
+                unreachable = unreachable + 1 if getattr(exc, "unreachable", False) else 0
                 failed += 1
                 out(f"  FAILED    {it.row_id}: {exc}")
     out(f"\nTest emails sent to {test_to}: {sent}   Failed: {failed}. No files or logs were changed.")
     return EXIT_PROBLEMS if failed else EXIT_OK
 
 
-# ---------------------------------------------------------------- the whole thing
+# == the whole thing ==
 
 def send_command(settings: Settings, mode: str, test_to: str = "", ask=input, out=_out) -> int:
     if mode == TEST and not valid_email(test_to):

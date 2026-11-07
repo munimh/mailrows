@@ -27,6 +27,14 @@ LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 class Refused(Exception):
     """The email was not accepted. Safe to try again later."""
 
+    def __init__(self, message: str, unreachable: bool = False):
+        super().__init__(message)
+        self.unreachable = unreachable  # True when the server could not be reached at all
+
+
+class StoppedBeforeSending(KeyboardInterrupt):
+    """Ctrl+C arrived before any of the message reached the server: it certainly did not go."""
+
 
 class Uncertain(Exception):
     """The connection broke while the server was receiving the email. It may have been delivered."""
@@ -144,13 +152,16 @@ class Mailer:
         return self.conn
 
     def send(self, message: EmailMessage, envelope_to: list[str]) -> None:
-        """Send or raise Refused / Uncertain. BCC addresses go in envelope_to only, never in a header."""
-        try:
-            conn = self._ready()
-        except (smtplib.SMTPException, OSError) as exc:
-            raise Refused(f"could not connect to the mail server: {exc}") from exc
+        """Send or raise Refused / Uncertain. BCC addresses go in envelope_to only, never in a header.
+
+        Ctrl+C before the message started going raises StoppedBeforeSending (it did not go);
+        Ctrl+C after that is re-raised as a plain KeyboardInterrupt (it may have gone)."""
         data_started = False
         try:
+            try:
+                conn = self._ready()
+            except (smtplib.SMTPException, OSError) as exc:
+                raise Refused(f"could not connect to the mail server: {exc}", unreachable=True) from exc
             code, resp = conn.mail(self.sender.from_email)
             if code != 250:
                 raise Refused(f"server refused the sender ({code} {resp!r})")
@@ -170,6 +181,11 @@ class Mailer:
                 raise Refused(f"server refused the message ({code} {_text(resp)})")
         except Refused:
             raise
+        except (KeyboardInterrupt, SystemExit):
+            self.conn = None  # the conversation was cut off mid-way; never reuse it
+            if data_started:
+                raise
+            raise StoppedBeforeSending() from None
         except smtplib.SMTPResponseException as exc:
             # a numbered reply from the server: it answered, and the answer was no
             raise Refused(f"server said {exc.smtp_code} {_text(exc.smtp_error)}") from exc

@@ -14,9 +14,14 @@ A receiver should treat row_id as the idempotency key: a retry can deliver the s
 
 from __future__ import annotations
 
+import urllib.parse
+
 from mailrows.config import ConfigError, looks_unset
 from mailrows.hooks import Hook, HookError, HookRow
 from mailrows.hooks.http import HttpError, JsonClient
+
+def _is_local(url: str) -> bool:
+    return urllib.parse.urlsplit(url).hostname in ("localhost", "127.0.0.1", "::1")
 
 
 class PostWebhook(Hook):
@@ -35,6 +40,9 @@ class PostWebhook(Hook):
             if looks_unset(value):
                 raise ConfigError("[webhook] header_value is not set (or set MAILROWS_WEBHOOK_HEADER_VALUE).")
             headers[name] = value
+            if self.url.lower().startswith("http://") and not _is_local(self.url):
+                raise ConfigError("[webhook] url uses http://, which would send header_value unencrypted. "
+                                  "Use https:// (http:// is only allowed for localhost).")
         self.columns = s.get_list("webhook", "columns")
         extra = {"sleep": sleep} if sleep else {}
         self.client = JsonClient(headers, per_second=s.get_float("webhook", "per_second", 5),

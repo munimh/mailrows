@@ -128,7 +128,10 @@ subject and body).
 - A rerun skips every row ID the log knows, whatever the status column says.
 - It also skips a row whose message is identical to one already sent under another ID (for
   example, a row copied with a new ID).
-- If the server refuses an email, the record is removed and the next run tries again.
+- If the server refuses an email, the record is removed and the next run tries again. The same
+  happens if you press Ctrl+C before the email has started going.
+- If the mail server can't be reached twice in a row, the run stops instead of waiting on every
+  remaining row. Those rows go on the next run.
 - If the process is killed, or the connection drops while the server is receiving the email,
   the record stays "sending". mailrows can't know whether it arrived, so it doesn't guess: the
   row is marked `check: may have been sent` and skipped. Look in your Sent folder, then:
@@ -139,7 +142,9 @@ subject and body).
   ```
 
 If the spreadsheet is open in Excel when a status needs writing, mailrows carries on (the log
-already protects you) and the next run fixes the status column. Close the file before a run to
+already protects you) and the next run fixes the status column. For a very large `.xlsx`, set
+`[input] status_save_every = 20` to save the status column every 20 emails instead of after
+each one; the send log is still updated after every email. Close the file before a run to
 avoid this; a real run refuses to start if it can't write to the sheet.
 
 To send to a row again on purpose, give it a new ID.

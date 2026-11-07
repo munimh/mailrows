@@ -12,6 +12,18 @@ import urllib.request
 RETRY_CODES = {429, 500, 502, 503, 504}
 
 
+class _NoRedirects(urllib.request.HTTPRedirectHandler):
+    """urllib would follow a redirect and resend our Authorization and secret headers to
+    whatever host it points at. An API call never needs a redirect, so refuse them all."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code,
+                                     f"refused to follow a redirect to {newurl.split('?')[0]}", headers, fp)
+
+
+_OPENER = urllib.request.build_opener(_NoRedirects)
+
+
 class HttpError(Exception):
     def __init__(self, message: str, status: int | None = None, body: str = ""):
         super().__init__(message)
@@ -57,15 +69,19 @@ class JsonClient:
             self.limiter.wait()
             req = urllib.request.Request(url, data=data, method=method, headers=headers)
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                with _OPENER.open(req, timeout=self.timeout) as resp:
                     raw = resp.read()
                     return json.loads(raw.decode("utf-8")) if raw.strip() else {}
             except urllib.error.HTTPError as exc:
-                text = exc.read().decode("utf-8", "replace")[:500]
+                if 300 <= exc.code < 400:
+                    raise HttpError(f"HTTP {exc.code}: {exc.reason}", exc.code) from None
+                text = exc.read().decode("utf-8", "replace")[:500] if exc.fp else ""
                 last = HttpError(f"HTTP {exc.code}", exc.code, text)
                 if exc.code not in RETRY_CODES:
                     raise last from None
-                wait = _retry_after(exc.headers.get("Retry-After"))
+                wait = _retry_after(exc.headers.get("Retry-After") if exc.headers else None)
+                if wait is not None:
+                    wait = min(wait, self.max_wait * 2)
             except (urllib.error.URLError, http.client.HTTPException, OSError) as exc:
                 reason = getattr(exc, "reason", exc)
                 last = HttpError(f"could not reach the server ({reason})")

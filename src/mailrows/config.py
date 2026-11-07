@@ -17,7 +17,7 @@ class ConfigError(Exception):
     """A setting is missing or wrong. The message says which and how to fix it."""
 
 
-PLACEHOLDER_MARKERS = ("CHANGE_ME", "YOUR_", "<", "xxxxxxxx")
+PLACEHOLDERS = {"change_me", "changeme", "your_password", "your_token", "paste_here"}
 
 
 def env_name(section: str, key: str) -> str:
@@ -26,8 +26,14 @@ def env_name(section: str, key: str) -> str:
 
 
 def looks_unset(value: str) -> bool:
+    """True for an empty value or an obvious placeholder. Only whole-value matches count, so a
+    real password that happens to contain '<' or 'your_' is accepted."""
     v = value.strip()
-    return not v or any(m.lower() in v.lower() for m in PLACEHOLDER_MARKERS)
+    if not v:
+        return True
+    if v.lower() in PLACEHOLDERS:
+        return True
+    return v.startswith("<") and v.endswith(">")  # e.g. <paste your token here>
 
 
 @dataclass
