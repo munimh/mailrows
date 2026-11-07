@@ -6,14 +6,14 @@ Output docs/demo.gif
 Set Shell "bash"
 Set FontSize 15
 Set Width 1100
-Set Height 980
+Set Height 780
 Set Padding 20
 Set TypingSpeed 45ms
 Set Theme "Builtin Dark"
 
 # start from an empty folder, off camera
 Hide
-Type "cd \"$(mktemp -d)\" && clear"
+Type `cd "$(mktemp -d)" && clear`
 Enter
 Sleep 500ms
 Show
