@@ -1,0 +1,27 @@
+# your settings and secrets: never commit these
+config.ini
+*.ini
+!config.example.ini
+.env
+
+# send logs and anything mailrows writes while running
+*.sqlite3
+*.sqlite3-journal
+sent-copy.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+
+# editors and systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+~$*.xlsx

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mailrows"
+dynamic = ["version"]
+description = "Send one templated email per spreadsheet row, safely: preview, confirm, never send twice."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = ["openpyxl>=3.0"]
+keywords = ["email", "mail merge", "smtp", "spreadsheet", "xlsx", "csv", "airtable"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Communications :: Email",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+mailrows = "mailrows.cli:main"
+
+[tool.hatch.version]
+path = "src/mailrows/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mailrows"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"config.example.ini" = "mailrows/_starter/config.example.ini"
+"examples" = "mailrows/_starter/examples"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

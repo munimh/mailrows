@@ -1,0 +1,14 @@
+Subject: Your place at the Riverside Maker Day, {first_name}
+Hi {first_name},
+
+Thanks for signing up for the Riverside Maker Day on Saturday 14 March.
+You're booked into: {session} ({seats} seat(s)).
+
+Doors open at 9:30. Bring a laptop if you have one; we'll have power strips,
+coffee and plenty of spare cables.
+
+Your booking reference is {id}. If you can't make it, just reply to this email
+and we'll offer your place to someone on the waiting list.
+
+See you there,
+The Maker Day volunteers

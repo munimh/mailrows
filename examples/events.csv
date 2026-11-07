@@ -1,0 +1,6 @@
+id,first_name,last_name,email,session,seats,status
+E-1001,Ada,Testperson,ada.testperson@example.com,Morning workshop,1,
+E-1002,Bram,Sampleton,bram.sampleton@example.com,Afternoon talks,2,
+E-1003,Cleo,Placeholder,cleo.placeholder@example.com,Morning workshop,1,
+E-1004,Dev,Fakename,dev.fakename@example,Afternoon talks,1,
+E-1005,Esme,Notreal,esme.notreal@example.com,Evening social,3,
