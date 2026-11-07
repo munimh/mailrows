@@ -3,9 +3,10 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
-## [0.1.0] - 2026-11-06
+## [0.1.0] - 2026-11-07
 
-First release.
+First release: mail merge from Excel or CSV through your own SMTP server, with a preview,
+a typed confirmation, and a send log that never sends the same email twice.
 
 ### Added
 - `mailrows send`: one templated email per row of an `.xlsx` or `.csv` file, with a preview
@@ -30,3 +31,5 @@ First release.
 - A run stops after the mail server is unreachable twice in a row.
 - HTTP redirects are never followed with credentials; webhook secrets require https.
 - CSV files keep their original line endings when the status column is written.
+
+[0.1.0]: https://github.com/munimh/mailrows/releases/tag/v0.1.0

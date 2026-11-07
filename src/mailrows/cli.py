@@ -86,7 +86,7 @@ def cmd_resolve(args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="mailrows",
-                                description="Send one templated email per spreadsheet row, safely.")
+                                description="Mail merge from Excel or CSV: one templated email per row, safely.")
     p.add_argument("--version", action="version", version=f"mailrows {__version__}")
     sub = p.add_subparsers(dest="command", required=True, metavar="command")
 

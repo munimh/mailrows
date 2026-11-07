@@ -5,19 +5,32 @@ build-backend = "hatchling.build"
 [project]
 name = "mailrows"
 dynamic = ["version"]
-description = "Send one templated email per spreadsheet row, safely: preview, confirm, never send twice."
+description = "Mail merge from Excel or CSV through your own SMTP server: preview, confirm, never send twice."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dependencies = ["openpyxl>=3.0"]
-keywords = ["email", "mail merge", "smtp", "spreadsheet", "xlsx", "csv", "airtable"]
+keywords = ["mail merge", "email", "smtp", "csv", "excel", "xlsx", "airtable", "bulk email", "cli"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
     "Environment :: Console",
     "Topic :: Communications :: Email",
 ]
+
+[project.urls]
+Homepage = "https://github.com/munimh/mailrows"
+Source = "https://github.com/munimh/mailrows"
+Issues = "https://github.com/munimh/mailrows/issues"
+Changelog = "https://github.com/munimh/mailrows/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
@@ -27,6 +40,9 @@ mailrows = "mailrows.cli:main"
 
 [tool.hatch.version]
 path = "src/mailrows/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["docs/"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mailrows"]

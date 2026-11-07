@@ -1,6 +1,14 @@
 # mailrows
 
-Send one templated email per row of a spreadsheet, safely, from your own computer.
+[![PyPI version](https://img.shields.io/pypi/v/mailrows)](https://pypi.org/project/mailrows/)
+[![Python versions](https://img.shields.io/pypi/pyversions/mailrows)](https://pypi.org/project/mailrows/)
+[![License: MIT](https://img.shields.io/pypi/l/mailrows)](https://github.com/munimh/mailrows/blob/main/LICENSE)
+[![tests](https://github.com/munimh/mailrows/actions/workflows/tests.yml/badge.svg)](https://github.com/munimh/mailrows/actions/workflows/tests.yml)
+
+Mail merge from Excel or CSV in Python: send one templated email per row of a spreadsheet
+through your own SMTP server, safely, from your own computer.
+
+![Terminal recording: mailrows init creates a starter folder, then mailrows send --dry-run shows the table of who will be emailed, the row skipped for a bad address, and one fully rendered sample email](https://raw.githubusercontent.com/munimh/mailrows/main/docs/demo.gif)
 
 - **Preview first.** Every row is checked, a table shows who will get an email, one email is
   shown in full, and nothing goes until you type `yes`.
@@ -52,7 +60,7 @@ mailrows send --test-to your.name@example.com
 ```
 
 **6. Send for real.** Put your own rows in `events.csv` (or point `[input] file` at an `.xlsx`;
-[`examples/events.xlsx`](examples/events.xlsx) is the same sample as a spreadsheet), then:
+[`examples/events.xlsx`](https://github.com/munimh/mailrows/blob/main/examples/events.xlsx) is the same sample as a spreadsheet), then:
 
 ```bash
 mailrows send
@@ -282,4 +290,4 @@ leaves your machine.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/munimh/mailrows/blob/main/LICENSE).
